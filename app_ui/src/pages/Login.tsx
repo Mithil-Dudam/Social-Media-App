@@ -4,6 +4,7 @@ import '../App.css'
 import { useNavigate } from "react-router-dom";
 import {MoveLeft} from "lucide-react"
 import { useAppContext } from './AppContext';
+const SOCKET_URL = "ws://localhost:8001/ws";
 
 function Login() {
     const navigate = useNavigate()
@@ -21,11 +22,13 @@ function Login() {
         try{
             const response = await api.post("/login",{email,password})
             if(response.status===200){
+                const id = response.data.user_id
                 setEmail("")
                 setPassword("")
                 setUserId(response.data.user_id)
                 setUsername(response.data.username)
                 setIsLoggedIn(true)
+                new WebSocket(`${SOCKET_URL}/user/${id}`)
                 navigate("/home")
             }
         }catch(error:any){
@@ -201,10 +204,10 @@ function Login() {
             <h1 className='text-center text-5xl py-10 '><span className='border-3 rounded-full p-3 bg-lime-300 bg-'>Social Media App</span></h1>
             {display===0&&
                 <div className={`border my-auto mx-auto w-[32.5%] px-5 bg-white rounded-lg ${flag===1?"":"h-[55vh]"}`}>
-                    <MoveLeft className='pt-1 cursor-pointer' onClick={()=>{
+                    {flag!==0&&<MoveLeft className='pt-1 cursor-pointer' onClick={()=>{
                         if(editFlag===0){ToLogin()}
-                        else{ToHome()}
-                    }}/>
+                        else{ToHome()}  
+                    }}/>}
                     <p className='text-center pt-5 font-semibold text-lg'>{editFlag===1?"":flag===1?"Welcome New User":"Login to Gain Access!"}</p>
                     <p className='text-center text-gray-500 text-sm'>{editFlag===1?"Edit":"Enter"} your details below</p>
                     <div className='pt-10 flex justify-between'>

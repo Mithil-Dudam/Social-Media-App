@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, status, Depends, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Annotated, Optional
 from datetime import datetime, timedelta
@@ -23,6 +24,30 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import random
 import shutil
+
+from langchain_ollama import OllamaLLM
+from langchain_core.prompts import ChatPromptTemplate
+
+template = """
+You are an AI chatbot that can engage in friendly, thoughtful, and helpful conversations with users.
+
+You adapt to the user's tone and intent — whether they want to chat casually, ask for advice, learn something, or just talk.
+
+Your personality is kind, intelligent, and respectful. You respond in a natural, conversational tone, with empathy when appropriate, and always aim to be engaging and clear.
+
+Here is the conversation history so far:
+{context}
+
+Here is the user's message:
+{user_input}
+
+Your response:
+"""
+
+model = OllamaLLM(model='llama3.2')
+prompt = ChatPromptTemplate.from_template(template)
+chain = prompt | model
+
 
 app = FastAPI()
 
@@ -70,6 +95,12 @@ class Texts(Base):
     text = Column(String,index=True)
     sent_by = Column(Integer,ForeignKey("Users.id"),index=True)
     image_url = Column(String,index=True)
+
+class Chatbot(Base):
+    __tablename__ = 'Chatbot'
+    id = Column(Integer, primary_key=True, index=True)
+    text = Column(String,index=True)
+    sent_by = Column(String,index=True)
 
 class Login(BaseModel):
     email:str
@@ -142,10 +173,10 @@ async def code(email:str,db:db_dependency):
     driver.get("https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&emr=1&followup=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&ifkv=AXH0vVt86mt7i6bhv8EZvXuyaR7kWN4K4-u8q61I6qnUga4y-0zTJljpaLm3qOEfkFS8TLm4BwzwFQ&osid=1&passive=1209600&service=mail&flowName=GlifWebSignIn&flowEntry=ServiceLogin&dsh=S68860218%3A1742620308666354")
     WebDriverWait(driver,10).until(EC.presence_of_element_located((By.ID,"identifierId")))
     input_email = driver.find_element(By.ID,"identifierId")
-    input_email.send_keys("your@emailID"+Keys.ENTER)
+    input_email.send_keys("f20210142@dubai.bits-pilani.ac.in"+Keys.ENTER)
     WebDriverWait(driver,30).until(EC.presence_of_element_located((By.NAME,"Passwd")))
     input_password = driver.find_element(By.NAME,"Passwd")
-    input_password.send_keys("emailpassword"+Keys.ENTER)
+    input_password.send_keys("bits2021$"+Keys.ENTER)
     WebDriverWait(driver,10).until(EC.presence_of_element_located((By.XPATH, "//div[text()='Compose']")))
     compose_button = driver.find_element(By.XPATH, "//div[text()='Compose']")
     compose_button.click()
@@ -197,6 +228,10 @@ async def all_users_broadcast(id:int,db:db_dependency):
         except:
             pass
     return user_list
+
+@app.get("/online-users")
+def get_online_users():
+    return JSONResponse(content={"online_users": manager.get_all_online()})
     
 @app.get("/all-users-chats",status_code=status.HTTP_200_OK)
 async def all_users_chats(id:int,db:db_dependency):
@@ -303,12 +338,10 @@ async def all_texts(chat_id:int,db:db_dependency):
     return [{"sent_by":text.sent_by,"text":text.text, "image_url":text.image_url} for text in texts]
 
 @app.get("/profile",status_code=status.HTTP_200_OK)
-async def profile(id:int,user_bool:bool,db:db_dependency):
+async def profile(id:int,db:db_dependency):
     user = db.query(Users).filter(Users.id==id).first()
     follows_count = len(user.follows or [])
     total_posts = db.query(Posts).filter(Posts.user_id==id).count()
-    if user_bool:
-        return {"username":user.username,"password":user.password,"bio":user.bio,"email":user.email,"total_posts":total_posts,"follows_count":follows_count}
     return {"username":user.username,"bio":user.bio,"email":user.email,"total_posts":total_posts,"follows_count":follows_count}
 
 @app.post("/edit",status_code=status.HTTP_202_ACCEPTED)
@@ -324,10 +357,45 @@ async def edit(id:int,editInfo:EditInfo,db:db_dependency):
     db.refresh(user)
     return {"message":"Profile Edited Successfully"}
 
+@app.delete("/delete-chatbot-chats",status_code=status.HTTP_200_OK)
+async def delete_chatbot_chats(db:db_dependency):
+    db.query(Chatbot).delete()
+    db.commit()
+    return {"message":"Chats Deleted"}
+
+@app.get("/chatbot-texts",status_code=status.HTTP_200_OK)
+async def chatbot_texts(db:db_dependency):
+    chatbot_chats = db.query(Chatbot).order_by(Chatbot.id.asc()).all()
+    return [{"text":chatbot_chat.text,"sent_by":chatbot_chat.sent_by} for chatbot_chat in chatbot_chats]
+
+@app.post("/to-chatbot",status_code=status.HTTP_200_OK)
+async def to_chatbot(db:db_dependency,text:str=Form(...)):
+    db_text = Chatbot(text=text,sent_by="user")
+    db.add(db_text)
+    db.commit()
+    db.refresh(db_text)
+
+    chatbot_chats = db.query(Chatbot).order_by(Chatbot.id.asc()).all()
+    context=""
+    for chat in chatbot_chats:
+        if chat.sent_by=="user":
+            sender = "User"
+        else:
+            sender = "AI"
+        context += f"\n{sender}: {chat.text}"
+
+    result = chain.invoke({"context":context,"user_input":text})
+    db_reply = Chatbot(text=result,sent_by="AI")
+    db.add(db_reply)
+    db.commit()
+    db.refresh(db_reply)
+    return {"reply":result}
+
 class ConnectionManager():
     def __init__(self):
         self.chat_connections: dict[int,list[WebSocket]] = {}
         self.broadcast_connections: list[WebSocket] = []
+        self.online_users: set[int] = set()
 
     async def connect_chat(self,websocket:WebSocket,chat_id:int):
         await websocket.accept()
@@ -339,6 +407,10 @@ class ConnectionManager():
         await websocket.accept()
         self.broadcast_connections.append(websocket)
 
+    async def connect_user(self,websocket:WebSocket,user_id:int):
+        await websocket.accept()
+        self.online_users.add(user_id)
+
     def disconnect_chat(self,websocket:WebSocket,chat_id:int):
         if chat_id in self.chat_connections:
             self.chat_connections[chat_id].remove(websocket)
@@ -347,6 +419,9 @@ class ConnectionManager():
 
     def disconnect_broadcast(self,websocket:WebSocket):
         self.broadcast_connections.remove(websocket)
+
+    def disconnect_user(self,websocket:WebSocket,user_id:int):
+        self.online_users.discard(user_id)
 
     async def send_to_chat(self,chat_id:int,message:str):
         if chat_id in self.chat_connections:
@@ -357,9 +432,15 @@ class ConnectionManager():
         for connection in self.broadcast_connections:
             await connection.send_text(message)
 
+    def is_online(self, user_id: int) -> bool:
+        return user_id in self.online_users
+
+    def get_all_online(self) -> list[int]:
+        return list(self.online_users)
+
 manager = ConnectionManager()
 
-@app.websocket("/ws/{chat_id}")
+@app.websocket("/ws/chat/{chat_id}")
 async def websocket_chat(websocket:WebSocket,chat_id:int):
     await manager.connect_chat(websocket,chat_id)
     try:
@@ -378,3 +459,12 @@ async def websocket_broadcast(websocket:WebSocket):
             await manager.broadcast(data)
     except WebSocketDisconnect:
         manager.disconnect_broadcast(websocket)
+
+@app.websocket("/ws/user/{user_id}")
+async def websocket_user_status(websocket:WebSocket, user_id:int):
+    await manager.connect_user(websocket,user_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect_user(websocket,user_id)

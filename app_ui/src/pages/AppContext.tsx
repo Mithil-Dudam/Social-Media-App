@@ -34,8 +34,6 @@ interface AppContextType  {
   setFlag: (flag:number) => void;
   profile:ProfileType|null;
   setProfile: (profile:ProfileType|null) => void;
-  userProfile:boolean;
-  setUserProfile: (userProfile:boolean) => void;
   broadcasts: { text: string; sent_by: number; username: string, image_url:string }[];
   setBroadcasts: React.Dispatch<React.SetStateAction<{ text: string; sent_by: number; username: string; image_url:string }[]>>;
   messages: { text: string; sent_by: number;  image_url:string ;chat_id:number}[];
@@ -57,7 +55,6 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [profile, setProfile] = useState<ProfileType|null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [flag,setFlag] = useState(0)
-  const [userProfile,setUserProfile] = useState(false)
   const [broadcasts, setBroadcasts] = useState<{ text: string; sent_by: number; username: string; image_url:string}[]>([]);
   const [messages, setMessages] = useState<{ text: string; sent_by: number, image_url:string, chat_id:number}[]>([]);
   const [editFlag,setEditFlag] = useState(0)
@@ -66,7 +63,7 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [bio,setBio] = useState("")
 
   return (
-    <AppContext.Provider value={{ userId, setUserId, chatId, setChatId, isLoggedIn, setIsLoggedIn, flag, setFlag, username, setUsername, profile, setProfile, userChoice, setUserChoice, recipient,setRecipient, error, setError, userProfile, setUserProfile, broadcasts, setBroadcasts, editFlag,setEditFlag, email,setEmail,password,setPassword,bio,setBio, messages, setMessages}}>
+    <AppContext.Provider value={{ userId, setUserId, chatId, setChatId, isLoggedIn, setIsLoggedIn, flag, setFlag, username, setUsername, profile, setProfile, userChoice, setUserChoice, recipient,setRecipient, error, setError, broadcasts, setBroadcasts, editFlag,setEditFlag, email,setEmail,password,setPassword,bio,setBio, messages, setMessages}}>
       {children}
     </AppContext.Provider>
   );

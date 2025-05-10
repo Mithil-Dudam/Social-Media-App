@@ -7,6 +7,7 @@ import Profile from "./pages/Profile";
 import PageNotFound from './pages/PageNotFound';
 import { AppContextProvider } from './pages/AppContext';
 import PrivateRoute from './pages/PrivateRoute';
+import Chatbot from "./pages/Chatbot";
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/home" element={<PrivateRoute><Home /></PrivateRoute>} />
           <Route path="/chats" element={<PrivateRoute><Chats /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+          <Route path="/chatbot" element={<PrivateRoute><Chatbot /></PrivateRoute>} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </Router>

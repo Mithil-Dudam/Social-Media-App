@@ -2,19 +2,19 @@ import { useEffect, useState, useRef } from 'react'
 import api from '../api';
 import '../App.css'
 import { useNavigate } from "react-router-dom";
-import {CircleUserRound, MoveLeft} from "lucide-react"
+import {CircleUserRound, MoveLeft, Images} from "lucide-react"
 import { useAppContext } from './AppContext';
 import useWebSocket from 'react-use-websocket';
 
-const SOCKET_URL = "ws://localhost:8000/ws";
+const SOCKET_URL = "ws://localhost:8001/ws";
 
 function Chats() {
     
   const navigate = useNavigate()
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
-  const {chatId, userId, setChatId, setProfile,userChoice,setUserChoice, setError, setRecipient, setUserProfile, username,  messages, setMessages} = useAppContext();
+  const {chatId, userId, setChatId, setProfile,userChoice,setUserChoice, setError, setRecipient, username,  messages, setMessages} = useAppContext();
   const [message,setMessage] = useState("")
-  const { sendMessage, lastMessage } = useWebSocket(`${SOCKET_URL}/${chatId}`, {
+  const { sendMessage, lastMessage } = useWebSocket(`${SOCKET_URL}/chat/${chatId}`, {
     shouldReconnect: () => true,
   });
 
@@ -95,13 +95,21 @@ function Chats() {
     setChatId(0)
     setRecipient(0)
     setProfile(null)
-    setUserProfile(false)
+    setMessages([])
     navigate("/home")
   }
 
   const ToChats = () => {
     setUserChoice("Chats")
+  }
+
+  const ToAIChatbot = () => {
+    setUserChoice("AI Chatbot")
+    setChatId(0)
+    setRecipient(0)
+    setProfile(null)
     setMessages([])
+    navigate("/chatbot")
   }
 
   const ToUserList = () => {
@@ -113,9 +121,8 @@ function Chats() {
   const ViewProfile = async (user_id:number) => {
     setError(null)
     navigate("/profile")
-    const user_bool = user_id === userId;
     try{
-        const response = await api.get(`/profile?id=${user_id}&user_bool=${user_bool}`)
+        const response = await api.get(`/profile?id=${user_id}`)
         if(response.status===200){
         setProfile(response.data)
         }
@@ -136,7 +143,8 @@ function Chats() {
         <div className='min-w-screen min-h-screen bg-fuchsia-300 flex'>
           <div className='border h-[100vh] w-[15%] bg-sky-200 flex flex-col'>
             <button className={`mt-10 text-lg border-t border-b cursor-pointer font-semibold ${userChoice==="Overview"?"bg-black text-white hover:bg-black":"bg-white hover:bg-lime-300 "}`} onClick={ToOverview} value="Overview">Overview</button>
-            <button className={`my-5 text-lg border-t border-b  cursor-pointer font-semibold ${userChoice==="Chats"?"bg-black text-white hover:bg-black":"bg-white hover:bg-lime-300 "}`} onClick={ToChats} value="Chats">Chats</button>
+            <button className={`mt-5 text-lg border-t border-b  cursor-pointer font-semibold ${userChoice==="Chats"?"bg-black text-white hover:bg-black":"bg-white hover:bg-lime-300 "}`} onClick={ToChats} value="Chats">Chats</button>
+            <button className={`my-5 text-lg border-t border-b  cursor-pointer font-semibold ${userChoice==="AI Chatbot"?"bg-black text-white hover:bg-black":"bg-white hover:bg-lime-300 "}`} onClick={ToAIChatbot} value="AI Chatbot">AI Chatbot</button>
             <div className='flex flex-grow'></div>
             <div className='border-t py-5 bg-white px-5'>
               <span className=' flex items-center justify-center cursor-pointer' onClick={()=>ViewProfile(userId)}>
@@ -160,7 +168,7 @@ function Chats() {
                     </span>}
                     {text.image_url&&<div className={`flex ${text.sent_by === userId ? "justify-end" : "justify-start"}`}>
                       <img
-                        src={`http://localhost:8000/${text.image_url}`}
+                        src={`http://localhost:8001/${text.image_url}`}
                         alt="Oops"
                         className="w-40 h-40 object-cover border rounded"
                       />
@@ -181,7 +189,7 @@ function Chats() {
                     </span>}
                     {msg.image_url&&<div className={`flex ${msg.sent_by === userId ? "justify-end" : "justify-start"}`}>
                       <img
-                        src={`http://localhost:8000/${msg.image_url}`}
+                        src={`http://localhost:8001/${msg.image_url}`}
                         alt="Oops"
                         className="w-40 h-40 object-cover border rounded"
                       />
@@ -199,7 +207,10 @@ function Chats() {
                   if(e.key==='Enter'){handleSendChat()}
                 }}
                 />
-                <input type="file" accept="image/*" onChange={handleImageChange} className='border ml-2 w-[5%] bg-white'/>
+                <label className="ml-2 px-2 py-1 bg-white border rounded cursor-pointer hover:bg-gray-100">
+                  <Images />
+                  <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                </label>
                 <button onClick={handleSendChat} className="ml-2 border-black border font-semibold cursor-pointer bg-blue-500 text-white p-1">
                 Send
                 </button>
