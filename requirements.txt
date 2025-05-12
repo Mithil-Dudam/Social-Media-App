@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+psycopg2
+sqlalchemy
+selenium
+langchain
+langchain-ollama
+ollama
+passlib[bcrypt]
